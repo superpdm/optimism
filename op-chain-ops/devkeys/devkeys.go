@@ -82,6 +82,16 @@ func (role SuperchainOperatorRole) String() string {
 	}
 }
 
+func (role *SuperchainOperatorRole) Parse(v string) error {
+	for i := SuperchainOperatorRole(0); i < 20; i++ {
+		if i.String() == v {
+			*role = i
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown superchain operator role %q", v)
+}
+
 // SuperchainOperatorKey is an account specific to an OperationRole of a given OP-Stack chain.
 type SuperchainOperatorKey struct {
 	ChainID *big.Int
@@ -168,6 +178,16 @@ func (role ChainOperatorRole) Key(chainID *big.Int) *ChainOperatorKey {
 		ChainID: chainID,
 		Role:    role,
 	}
+}
+
+func (role *ChainOperatorRole) Parse(v string) error {
+	for i := ChainOperatorRole(0); i < 20; i++ {
+		if i.String() == v {
+			*role = i
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown chain operator role %q", v)
 }
 
 // ChainOperatorKey is an account specific to an OperationRole of a given OP-Stack chain.
