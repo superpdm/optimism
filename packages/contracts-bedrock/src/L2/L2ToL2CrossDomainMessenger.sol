@@ -4,10 +4,13 @@ pragma solidity 0.8.25;
 import { Encoding } from "src/libraries/Encoding.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { CrossL2Inbox } from "src/L2/CrossL2Inbox.sol";
+import { ICrossL2Inbox } from "src/L2/ICrossL2Inbox.sol";
 import { IL2ToL2CrossDomainMessenger } from "src/L2/IL2ToL2CrossDomainMessenger.sol";
 import { ISemver } from "src/universal/ISemver.sol";
 import { SafeCall } from "src/libraries/SafeCall.sol";
 import { TransientReentrancyAware } from "src/libraries/TransientContext.sol";
+
+import "forge-std/console.sol";
 
 /// @notice Thrown when a non-written slot in transient storage is attempted to be read from.
 error NotEntered();
@@ -69,13 +72,25 @@ contract L2ToL2CrossDomainMessenger is IL2ToL2CrossDomainMessenger, ISemver, Tra
     ///         message.
     uint240 internal msgNonce;
 
+    /// @notice Emitted whenever a message is sent to a destination
+    /// @param destination  Chain ID of the destination chain.
+    /// @param target       Target contract or wallet address.
+    /// @param messageNonce Nonce associated with the messsage sent
+    /// @param sender       Address initiating this message call
+    /// @param message      Message payload to call target with.
+    event SentMessage(uint256 indexed destination, address indexed target, uint256 indexed messageNonce, address sender, bytes message);
+
     /// @notice Emitted whenever a message is successfully relayed on this chain.
-    /// @param messageHash Hash of the message that was relayed.
-    event RelayedMessage(bytes32 indexed messageHash);
+    /// @param source       Chain ID of the source chain.
+    /// @param messageNonce Nonce associated with the messsage sent
+    /// @param messageHash  Hash of the message that was relayed.
+    event RelayedMessage(uint256 indexed source, uint256 indexed messageNonce, bytes32 indexed messageHash);
 
     /// @notice Emitted whenever a message fails to be relayed on this chain.
-    /// @param messageHash Hash of the message that failed to be relayed.
-    event FailedRelayedMessage(bytes32 indexed messageHash);
+    /// @param messageHash  Hash of the message that failed to be relayed.
+    /// @param source       Chain ID of the source chain.
+    /// @param messageNonce Nonce associated with the messsage sent
+    event FailedRelayedMessage(uint256 indexed source, uint256 indexed messageNonce, bytes32 indexed messageHash);
 
     /// @notice Retrieves the sender of the current cross domain message. If not entered, reverts.
     /// @return _sender Address of the sender of the current cross domain message.
@@ -104,14 +119,67 @@ contract L2ToL2CrossDomainMessenger is IL2ToL2CrossDomainMessenger, ISemver, Tra
         if (_target == Predeploys.CROSS_L2_INBOX) revert MessageTargetCrossL2Inbox();
         if (_target == Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER) revert MessageTargetL2ToL2CrossDomainMessenger();
 
+        /*
         bytes memory data = abi.encodeCall(
-            L2ToL2CrossDomainMessenger.relayMessage,
+            L2ToL2CrossDomainMessenger.execute,
             (_destination, block.chainid, messageNonce(), msg.sender, _target, _message)
         );
         assembly {
             log0(add(data, 0x20), mload(data))
         }
+         */
+
+        emit SentMessage(_destination, _target, messageNonce(), msg.sender, _message);
+
         msgNonce++;
+    }
+
+    function relayMessage2(ICrossL2Inbox.Identifier calldata _id, bytes calldata _sentMessage) external payable nonReentrant {
+        console.logString("in relay message function");
+
+        // Ensure the log came from the messenger and validate with the cross l2 inbox
+        if (_id.origin != Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER) revert("not the l2 cdm");
+        CrossL2Inbox(Predeploys.CROSS_L2_INBOX).validateMessage(_id, keccak256(_sentMessage));
+
+        console.logString("passed validation");
+
+        // Open Question:
+        //   - should we assert length on `_sentMessage` prior to decoding? It's structure should implicitly be known and valid
+        //   as _id is already validated via the inbox
+        //
+        //   - How does this work between upgrades? The log data wouldn't be evolvable without invalidating unsent messages. New
+        //   entrypoint / relay mechanisms must be introduced? Or the `log.Data` could be parsed after decoding the versioned
+        //   message nonce? However this would break the event signature
+
+        // decode the topics (skipping the event signature. Maybe we want to validate this?)
+        (uint256 _destination, address _target, uint256 _nonce) = abi.decode(_sentMessage[32:128], (uint256,address,uint256));
+        if (_destination != block.chainid) revert MessageDestinationNotRelayChain();
+
+        console.logString("decoded topics");
+
+        // decode the log data
+        (address _sender, bytes memory _message) = abi.decode(_sentMessage[128:], (address,bytes));
+
+        console.logString("decoded data");
+
+        uint256 _source = _id.chainId;
+        bytes32 messageHash = keccak256(abi.encode(_destination, _source, _nonce, _sender, _target, _message));
+        if (successfulMessages[messageHash]) {
+            revert MessageAlreadyRelayed();
+        }
+
+        _storeMessageMetadata(_source, _sender);
+
+        bool success = SafeCall.call(_target, msg.value, _message);
+
+        if (success) {
+            successfulMessages[messageHash] = true;
+            emit RelayedMessage(_source, _nonce, messageHash);
+        } else {
+            emit FailedRelayedMessage(_source, _nonce, messageHash);
+        }
+
+        _storeMessageMetadata(0, address(0));
     }
 
     /// @notice Relays a message that was sent by the other CrossDomainMessenger contract. Can only be executed via
@@ -156,9 +224,9 @@ contract L2ToL2CrossDomainMessenger is IL2ToL2CrossDomainMessenger, ISemver, Tra
 
         if (success) {
             successfulMessages[messageHash] = true;
-            emit RelayedMessage(messageHash);
+            emit RelayedMessage(_source, _nonce, messageHash);
         } else {
-            emit FailedRelayedMessage(messageHash);
+            emit FailedRelayedMessage(_source, _nonce, messageHash);
         }
 
         _storeMessageMetadata(0, address(0));

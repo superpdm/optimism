@@ -22,6 +22,9 @@ import {
     ReentrantCall
 } from "src/L2/L2ToL2CrossDomainMessenger.sol";
 import { CrossL2Inbox } from "src/L2/CrossL2Inbox.sol";
+import { ICrossL2Inbox } from "src/L2/ICrossL2Inbox.sol";
+
+import "forge-std/console.sol";
 
 /// @title L2ToL2CrossDomainMessengerWithModifiableTransientStorage
 /// @dev L2ToL2CrossDomainMessenger contract with methods to modify the transient storage.
@@ -109,6 +112,8 @@ contract L2ToL2CrossDomainMessengerTest is Test {
         // Check that the event was emitted with the correct parameters
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertEq(logs.length, 1);
+
+        /*
         assertEq(
             logs[0].data,
             abi.encodeCall(
@@ -116,6 +121,16 @@ contract L2ToL2CrossDomainMessengerTest is Test {
                 (_destination, block.chainid, messageNonce, address(this), _target, _message)
             )
         );
+         */
+
+        // topics
+        assertEq(logs[0].topics[0], keccak256("SentMessage(uint256,address,uint256,address,bytes)"));
+        assertEq(logs[0].topics[1], bytes32(_destination));
+        assertEq(logs[0].topics[2], bytes32(uint256(uint160(_target))));
+        assertEq(logs[0].topics[3], bytes32(messageNonce));
+
+        // data
+        assertEq(logs[0].data, abi.encode(address(this), _message));
 
         // Check that the message nonce has been incremented
         assertEq(l2ToL2CrossDomainMessenger.messageNonce(), messageNonce + 1);
@@ -167,6 +182,51 @@ contract L2ToL2CrossDomainMessengerTest is Test {
         });
     }
 
+    function testFuzz_relayMessage2_succeeds(
+        uint256 _source,
+        uint256 _nonce,
+        address _sender,
+        address _target,
+        bytes calldata _message,
+        uint256 _value
+    )
+        external
+    {
+
+        console.logString("running test");
+
+        // Ensure that the target contract is not CrossL2Inbox or L2ToL2CrossDomainMessenger
+        vm.assume(_target != Predeploys.CROSS_L2_INBOX && _target != Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER);
+
+        // Ensure that the target call is payable if value is sent
+        if (_value > 0) assumePayable(_target);
+
+        // Ensure that the target contract does not revert
+        vm.mockCall({ callee: _target, msgValue: _value, data: _message, returnData: abi.encode(true) });
+
+        // construct the payload & identifier
+        bytes32 sig = keccak256("SentMessage(uint256,address,uint256,address,bytes)");
+        bytes memory payload = abi.encodePacked(abi.encode(sig, block.chainid, _target, _nonce), abi.encode(_sender, _message));
+        ICrossL2Inbox.Identifier memory id = ICrossL2Inbox.Identifier(Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER, 1, 1, 1, _source);
+
+        // Ensure the CrossL2Inbox validates this message
+        vm.mockCall({
+            callee: Predeploys.CROSS_L2_INBOX,
+            data: abi.encodeWithSelector(CrossL2Inbox.validateMessage.selector, id, payload),
+            returnData: ""
+        });
+
+        // relay the message
+        hoax(Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER, _value);
+        l2ToL2CrossDomainMessenger.relayMessage2{ value: _value }(id, payload);
+        assertEq(
+            l2ToL2CrossDomainMessenger.successfulMessages(
+                keccak256(abi.encode(block.chainid, _source, _nonce, _sender, _target, _message))
+            ),
+            true
+        );
+    }
+
     /// @dev Tests that the `relayMessage` function succeeds and emits the correct RelayedMessage event.
     function testFuzz_relayMessage_succeeds(
         uint256 _source,
@@ -197,6 +257,7 @@ contract L2ToL2CrossDomainMessengerTest is Test {
         // Look for correct emitted event
         vm.expectEmit(Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER);
         emit L2ToL2CrossDomainMessenger.RelayedMessage(
+            _source, _nonce,
             keccak256(abi.encode(block.chainid, _source, _nonce, _sender, _target, _message))
         );
 
@@ -275,6 +336,7 @@ contract L2ToL2CrossDomainMessengerTest is Test {
         // Look for correct emitted event
         vm.expectEmit(Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER);
         emit L2ToL2CrossDomainMessenger.RelayedMessage(
+            _source, _nonce,
             keccak256(abi.encode(block.chainid, _source, _nonce, _sender, target, message))
         );
 
@@ -367,6 +429,7 @@ contract L2ToL2CrossDomainMessengerTest is Test {
         // Look for correct emitted event
         vm.expectEmit(Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER);
         emit L2ToL2CrossDomainMessenger.FailedRelayedMessage(
+            _source1, _nonce,
             keccak256(abi.encode(block.chainid, _source1, _nonce, _sender1, target, message))
         );
 
@@ -607,6 +670,7 @@ contract L2ToL2CrossDomainMessengerTest is Test {
         // Look for correct emitted event for first call.
         vm.expectEmit(Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER);
         emit L2ToL2CrossDomainMessenger.RelayedMessage(
+            _source, _nonce,
             keccak256(abi.encode(block.chainid, _source, _nonce, _sender, _target, _message))
         );
 
@@ -671,6 +735,7 @@ contract L2ToL2CrossDomainMessengerTest is Test {
         // Look for correct emitted event
         vm.expectEmit(Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER);
         emit L2ToL2CrossDomainMessenger.FailedRelayedMessage(
+            _source, _nonce,
             keccak256(abi.encode(block.chainid, _source, _nonce, _sender, _target, _message))
         );
 
