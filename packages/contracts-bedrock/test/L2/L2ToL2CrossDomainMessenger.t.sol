@@ -192,9 +192,6 @@ contract L2ToL2CrossDomainMessengerTest is Test {
     )
         external
     {
-
-        console.logString("running test");
-
         // Ensure that the target contract is not CrossL2Inbox or L2ToL2CrossDomainMessenger
         vm.assume(_target != Predeploys.CROSS_L2_INBOX && _target != Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER);
 

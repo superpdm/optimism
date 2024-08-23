@@ -10,8 +10,6 @@ import { ISemver } from "src/universal/ISemver.sol";
 import { SafeCall } from "src/libraries/SafeCall.sol";
 import { TransientReentrancyAware } from "src/libraries/TransientContext.sol";
 
-import "forge-std/console.sol";
-
 /// @notice Thrown when a non-written slot in transient storage is attempted to be read from.
 error NotEntered();
 
@@ -135,13 +133,9 @@ contract L2ToL2CrossDomainMessenger is IL2ToL2CrossDomainMessenger, ISemver, Tra
     }
 
     function relayMessage2(ICrossL2Inbox.Identifier calldata _id, bytes calldata _sentMessage) external payable nonReentrant {
-        console.logString("in relay message function");
-
         // Ensure the log came from the messenger and validate with the cross l2 inbox
         if (_id.origin != Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER) revert("not the l2 cdm");
         CrossL2Inbox(Predeploys.CROSS_L2_INBOX).validateMessage(_id, keccak256(_sentMessage));
-
-        console.logString("passed validation");
 
         // Open Question:
         //   - should we assert length on `_sentMessage` prior to decoding? It's structure should implicitly be known and valid
@@ -155,12 +149,8 @@ contract L2ToL2CrossDomainMessenger is IL2ToL2CrossDomainMessenger, ISemver, Tra
         (uint256 _destination, address _target, uint256 _nonce) = abi.decode(_sentMessage[32:128], (uint256,address,uint256));
         if (_destination != block.chainid) revert MessageDestinationNotRelayChain();
 
-        console.logString("decoded topics");
-
         // decode the log data
         (address _sender, bytes memory _message) = abi.decode(_sentMessage[128:], (address,bytes));
-
-        console.logString("decoded data");
 
         uint256 _source = _id.chainId;
         bytes32 messageHash = keccak256(abi.encode(_destination, _source, _nonce, _sender, _target, _message));
