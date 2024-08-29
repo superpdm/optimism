@@ -24,8 +24,6 @@ import {
 import { CrossL2Inbox } from "src/L2/CrossL2Inbox.sol";
 import { ICrossL2Inbox } from "src/L2/ICrossL2Inbox.sol";
 
-import "forge-std/console.sol";
-
 /// @title L2ToL2CrossDomainMessengerWithModifiableTransientStorage
 /// @dev L2ToL2CrossDomainMessenger contract with methods to modify the transient storage.
 ///      This is used to test the transient storage of L2ToL2CrossDomainMessenger.
@@ -113,18 +111,8 @@ contract L2ToL2CrossDomainMessengerTest is Test {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertEq(logs.length, 1);
 
-        /*
-        assertEq(
-            logs[0].data,
-            abi.encodeCall(
-                L2ToL2CrossDomainMessenger.relayMessage,
-                (_destination, block.chainid, messageNonce, address(this), _target, _message)
-            )
-        );
-         */
-
         // topics
-        assertEq(logs[0].topics[0], keccak256("SentMessage(uint256,address,uint256,address,bytes)"));
+        assertEq(logs[0].topics[0], L2ToL2CrossDomainMessenger.SentMessage.selector);
         assertEq(logs[0].topics[1], bytes32(_destination));
         assertEq(logs[0].topics[2], bytes32(uint256(uint160(_target))));
         assertEq(logs[0].topics[3], bytes32(messageNonce));
@@ -201,21 +189,24 @@ contract L2ToL2CrossDomainMessengerTest is Test {
         // Ensure that the target contract does not revert
         vm.mockCall({ callee: _target, msgValue: _value, data: _message, returnData: abi.encode(true) });
 
-        // construct the payload & identifier
-        bytes32 sig = keccak256("SentMessage(uint256,address,uint256,address,bytes)");
-        bytes memory payload = abi.encodePacked(abi.encode(sig, block.chainid, _target, _nonce), abi.encode(_sender, _message));
+        // construct the SentMessage payload & identifier
         ICrossL2Inbox.Identifier memory id = ICrossL2Inbox.Identifier(Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER, 1, 1, 1, _source);
+        bytes memory sentMessage =
+            abi.encodePacked(
+                abi.encode(L2ToL2CrossDomainMessenger.SentMessage.selector, block.chainid, _target, _nonce), // topics
+                abi.encode(_sender, _message) // data
+        );
 
         // Ensure the CrossL2Inbox validates this message
         vm.mockCall({
             callee: Predeploys.CROSS_L2_INBOX,
-            data: abi.encodeWithSelector(CrossL2Inbox.validateMessage.selector, id, payload),
+            data: abi.encodeWithSelector(CrossL2Inbox.validateMessage.selector, id, sentMessage),
             returnData: ""
         });
 
         // relay the message
         hoax(Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER, _value);
-        l2ToL2CrossDomainMessenger.relayMessage2{ value: _value }(id, payload);
+        l2ToL2CrossDomainMessenger.relayMessage2{ value: _value }(id, sentMessage);
         assertEq(
             l2ToL2CrossDomainMessenger.successfulMessages(
                 keccak256(abi.encode(block.chainid, _source, _nonce, _sender, _target, _message))

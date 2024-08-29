@@ -22,6 +22,9 @@ error RelayMessageCallerNotCrossL2Inbox();
 /// @notice Thrown when attempting to relay a message where CrossL2Inbox's origin is not L2ToL2CrossDomainMessenger.
 error CrossL2InboxOriginNotL2ToL2CrossDomainMessenger();
 
+/// @notice Thrown when the payload provided to the relay is not a sent message event.
+error CrossL2InboxPayloadNotSentMessageEvent();
+
 /// @notice Thrown when attempting to relay a message whose destination chain is not the chain relaying it.
 error MessageDestinationNotRelayChain();
 
@@ -85,9 +88,9 @@ contract L2ToL2CrossDomainMessenger is IL2ToL2CrossDomainMessenger, ISemver, Tra
     event RelayedMessage(uint256 indexed source, uint256 indexed messageNonce, bytes32 indexed messageHash);
 
     /// @notice Emitted whenever a message fails to be relayed on this chain.
-    /// @param messageHash  Hash of the message that failed to be relayed.
     /// @param source       Chain ID of the source chain.
     /// @param messageNonce Nonce associated with the messsage sent
+    /// @param messageHash  Hash of the message that failed to be relayed.
     event FailedRelayedMessage(uint256 indexed source, uint256 indexed messageNonce, bytes32 indexed messageHash);
 
     /// @notice Retrieves the sender of the current cross domain message. If not entered, reverts.
@@ -117,39 +120,33 @@ contract L2ToL2CrossDomainMessenger is IL2ToL2CrossDomainMessenger, ISemver, Tra
         if (_target == Predeploys.CROSS_L2_INBOX) revert MessageTargetCrossL2Inbox();
         if (_target == Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER) revert MessageTargetL2ToL2CrossDomainMessenger();
 
-        /*
-        bytes memory data = abi.encodeCall(
-            L2ToL2CrossDomainMessenger.execute,
-            (_destination, block.chainid, messageNonce(), msg.sender, _target, _message)
-        );
-        assembly {
-            log0(add(data, 0x20), mload(data))
-        }
-         */
-
         emit SentMessage(_destination, _target, messageNonce(), msg.sender, _message);
 
         msgNonce++;
     }
 
+    /// @notice Relays a message that was sent by the other CrossDomainMessenger contract. Can only be executed via
+    ///         cross-chain call from the other messenger OR if the message was already received once and is currently
+    ///         being replayed.
+    /// @param _id          CrossL2Inbox Identifier of the cross l2 CrossDomainMessenger SentMessage event
+    /// @param _sentMessage Message payload of the CrossDomainMessenger SentMessage event
     function relayMessage2(ICrossL2Inbox.Identifier calldata _id, bytes calldata _sentMessage) external payable nonReentrant {
         // Ensure the log came from the messenger and validate with the cross l2 inbox
-        if (_id.origin != Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER) revert("not the l2 cdm");
+        if (_id.origin != Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER) revert CrossL2InboxOriginNotL2ToL2CrossDomainMessenger();
         CrossL2Inbox(Predeploys.CROSS_L2_INBOX).validateMessage(_id, keccak256(_sentMessage));
 
-        // Open Question:
-        //   - should we assert length on `_sentMessage` prior to decoding? It's structure should implicitly be known and valid
-        //   as _id is already validated via the inbox
-        //
-        //   - How does this work between upgrades? The log data wouldn't be evolvable without invalidating unsent messages. New
-        //   entrypoint / relay mechanisms must be introduced? Or the `log.Data` could be parsed after decoding the versioned
-        //   message nonce? However this would break the event signature
+        // Some Notes/Questions:
+        //   - No need to assert the length as the inbox validates this message.
+        //   - We have some different options for the upgrade path. New event log from the sender for example
 
-        // decode the topics (skipping the event signature. Maybe we want to validate this?)
-        (uint256 _destination, address _target, uint256 _nonce) = abi.decode(_sentMessage[32:128], (uint256,address,uint256));
+        // decode the log
+        (bytes32 selector, uint256 _destination, address _target, uint256 _nonce) =
+            abi.decode(_sentMessage, (bytes32,uint256,address,uint256));
+
+        if (selector != SentMessage.selector) revert CrossL2InboxPayloadNotSentMessageEvent();
         if (_destination != block.chainid) revert MessageDestinationNotRelayChain();
 
-        // decode the log data
+        // decode the log data (this is done seperately due to some abi decoding issues to look into)
         (address _sender, bytes memory _message) = abi.decode(_sentMessage[128:], (address,bytes));
 
         uint256 _source = _id.chainId;
