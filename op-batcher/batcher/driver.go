@@ -486,7 +486,7 @@ func (l *BatchSubmitter) clearState(ctx context.Context) {
 	}
 }
 
-// publishTxToL1 submits a single state tx to the L1
+// publishTxToL1 submits a single tx to the L1
 func (l *BatchSubmitter) publishTxToL1(ctx context.Context, queue *txmgr.Queue[txRef], receiptsCh chan txmgr.TxReceipt[txRef]) error {
 	// send all available transactions
 	l1tip, err := l.l1Tip(ctx)
