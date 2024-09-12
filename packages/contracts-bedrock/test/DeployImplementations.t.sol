@@ -257,6 +257,10 @@ contract DeployImplementations_Test is Test {
         release = string(bytes.concat(hash(_seed, 5)));
         superchainConfigProxy = SuperchainConfig(address(uint160(uint256(hash(_seed, 6)))));
         protocolVersionsProxy = ProtocolVersions(address(uint160(uint256(hash(_seed, 7)))));
+        // Must configure the ProxyAdmin contract.
+        ProxyAdmin proxyAdmin = new ProxyAdmin(msg.sender);
+        _input.superchainProxyAdmin = proxyAdmin;
+        vm.etch(address(_input.superchainProxyAdmin), address(proxyAdmin).code);
 
         dii.set(dii.withdrawalDelaySeconds.selector, withdrawalDelaySeconds);
         dii.set(dii.minProposalSizeBytes.selector, minProposalSizeBytes);

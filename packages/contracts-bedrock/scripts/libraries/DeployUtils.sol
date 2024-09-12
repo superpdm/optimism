@@ -20,15 +20,8 @@ library DeployUtils {
         require(_who.code.length > 0, string.concat("DeployUtils: no code at ", LibString.toHexStringChecksummed(_who)));
     }
 
-    function assertEIP1967ImplementationSet(address _proxy) internal {
+    function assertEIP1967Implementation(address _proxy) internal {
         address implementation = Proxy(payable(_proxy)).implementation();
-        assertValidContractAddress(implementation);
-    }
-
-    function assertEIP1967Implementation(address _proxy) internal view {
-        (bool success, bytes memory result) = _proxy.staticcall(abi.encodeWithSignature("implementation()"));
-        require(success, "DeployUtils: EIP1967 implementation check failed");
-        address implementation = abi.decode(result, (address));
         assertValidContractAddress(implementation);
     }
 

@@ -2,6 +2,7 @@
 pragma solidity 0.8.15;
 
 import { Script } from "forge-std/Script.sol";
+import "forge-std/console.sol";
 
 import { LibString } from "@solady/utils/LibString.sol";
 
@@ -191,8 +192,8 @@ contract DeployImplementationsOutput is Script {
         DeployUtils.assertValidContractAddresses(addrs);
     }
 
-    function opsm() public view returns (OPStackManager) {
-        DeployUtils.assertValidContractAddress(address(_opsm));
+    function opsm() public returns (OPStackManager) {
+        DeployUtils.assertValidContractAddress(address(outputs.opsm));
         // We prank as the zero address due to the Proxy's `proxyCallIfNotAdmin` modifier.
         vm.prank(address(0));
         DeployUtils.assertEIP1967Implementation(address(_opsm));
@@ -311,22 +312,22 @@ contract DeployImplementations is Script {
     {
         SuperchainConfig superchainConfigProxy = _dii.superchainConfigProxy();
         ProtocolVersions protocolVersionsProxy = _dii.protocolVersionsProxy();
+        ProxyAdmin proxyAdmin = _dii.superchainProxyAdmin();
+        address proxyAdminOwner = proxyAdmin.owner();
 
-        // In this case, DeployImplementations script needs to deploy a proxy contract and the opsm contract.
-        // To deploy a proxy contract, you need to know the proxy admin.
-        // However, this proxy admin is not deployed until the OPStackManager.
-        // Not using blueprint because we don't have access to l2ChainId.
-
-        // Setting proxy admin to msg.sender because ProxyAdmin is not deployed yet.
-        vm.broadcast(msg.sender);
-        Proxy proxy = new Proxy(address(_dii.superchainProxyAdmin()));
+        vm.startBroadcast(proxyAdminOwner);
+        Proxy proxy = new Proxy(address(proxyAdmin));
         OPStackManager opsm = new OPStackManager({
             _superchainConfig: superchainConfigProxy,
             _protocolVersions: protocolVersionsProxy,
             _blueprints: blueprints
         });
-        proxy.upgradeTo(address(opsm));
         vm.stopBroadcast();
+
+        // We broadcast as the proxyAdminOwner address due to the ProxyAdmin's `onlyOwner` modifier.
+        vm.broadcast(proxyAdminOwner);
+        proxyAdmin.upgrade(payable(proxy), address(opsm));
+
         opsmProxy_ = OPStackManager(address(proxy));
     }
 
