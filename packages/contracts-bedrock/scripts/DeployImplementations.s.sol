@@ -311,8 +311,8 @@ contract DeployImplementations is Script {
         // However, this proxy admin is not deployed until the OPStackManager.
         // Not using blueprint because we don't have access to l2ChainId.
         vm.broadcast(msg.sender);
-        Proxy proxy = new Proxy(msg.sender); // Setting proxy admin to msg.sender because ProxyAdmin is not deployed
-            // yet.
+        // Setting proxy admin to msg.sender because ProxyAdmin is not deployed yet.
+        Proxy proxy = new Proxy(msg.sender);
         OPStackManager opsm = new OPStackManager({
             _superchainConfig: superchainConfigProxy,
             _protocolVersions: protocolVersionsProxy,
