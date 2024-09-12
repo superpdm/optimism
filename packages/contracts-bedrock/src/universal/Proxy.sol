@@ -2,7 +2,6 @@
 pragma solidity 0.8.15;
 
 import { Constants } from "src/libraries/Constants.sol";
-import "forge-std/console.sol";
 
 /// @title Proxy
 /// @notice Proxy is a transparent proxy that passes through the call if the caller is the owner or
@@ -97,8 +96,6 @@ contract Proxy {
     /// @return Implementation address.
     function implementation() public virtual proxyCallIfNotAdmin returns (address) {
         address impl = _getImplementation();
-        console.log("inside proxy.sol implementation()");
-        console.log(impl);
         return impl;
     }
 
@@ -153,12 +150,9 @@ contract Proxy {
     function _getImplementation() internal view returns (address) {
         address impl;
         bytes32 proxyImplementation = Constants.PROXY_IMPLEMENTATION_ADDRESS;
-        console.logBytes32(proxyImplementation);
         assembly {
             impl := sload(proxyImplementation)
         }
-        console.log("inside proxy.sol _getImplementation()");
-        console.log(impl);
         return impl;
     }
 

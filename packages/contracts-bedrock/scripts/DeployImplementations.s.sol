@@ -2,7 +2,6 @@
 pragma solidity 0.8.15;
 
 import { Script } from "forge-std/Script.sol";
-import "forge-std/console.sol";
 
 import { LibString } from "@solady/utils/LibString.sol";
 
@@ -131,9 +130,14 @@ contract DeployImplementationsInput {
         require(address(_protocolVersionsProxy) != address(0), "DeployImplementationsInput: not set");
         return _protocolVersionsProxy;
     }
+
+    function superchainProxyAdmin() public view returns (ProxyAdmin) {
+        assertInputSet();
+        return inputs.superchainProxyAdmin;
+    }
 }
 
-contract DeployImplementationsOutput {
+contract DeployImplementationsOutput is Script {
     OPStackManager internal _opsm;
     DelayedWETH internal _delayedWETHImpl;
     OptimismPortal2 internal _optimismPortalImpl;
@@ -189,7 +193,9 @@ contract DeployImplementationsOutput {
 
     function opsm() public view returns (OPStackManager) {
         DeployUtils.assertValidContractAddress(address(_opsm));
-        DeployUtils.assertEIP1967ImplementationSet(address(_opsm));
+        // We prank as the zero address due to the Proxy's `proxyCallIfNotAdmin` modifier.
+        vm.prank(address(0));
+        DeployUtils.assertEIP1967Implementation(address(_opsm));
         return _opsm;
     }
 
@@ -310,9 +316,10 @@ contract DeployImplementations is Script {
         // To deploy a proxy contract, you need to know the proxy admin.
         // However, this proxy admin is not deployed until the OPStackManager.
         // Not using blueprint because we don't have access to l2ChainId.
-        vm.broadcast(msg.sender);
+
         // Setting proxy admin to msg.sender because ProxyAdmin is not deployed yet.
-        Proxy proxy = new Proxy(msg.sender);
+        vm.broadcast(msg.sender);
+        Proxy proxy = new Proxy(address(_dii.superchainProxyAdmin()));
         OPStackManager opsm = new OPStackManager({
             _superchainConfig: superchainConfigProxy,
             _protocolVersions: protocolVersionsProxy,

@@ -335,6 +335,7 @@ contract DeployOPChain_TestBase is Test {
     string release = "op-contracts/latest";
     SuperchainConfig superchainConfigProxy;
     ProtocolVersions protocolVersionsProxy;
+    ProxyAdmin superchainProxyAdmin;
 
     // Define default inputs for DeployOPChain.
     // `opsm` is set during `setUp` since it is an output of the previous step.
