@@ -189,9 +189,6 @@ func (conf *Config) Check() error {
 			return errors.New("discovery requires a persistent or in-memory discv5 db, but found none")
 		}
 	}
-	if conf.PeersLo == 0 || conf.PeersHi == 0 || conf.PeersLo > conf.PeersHi {
-		return fmt.Errorf("peers lo/hi tides are invalid: %d, %d", conf.PeersLo, conf.PeersHi)
-	}
 	if conf.MeshD <= 0 || conf.MeshD > maxMeshParam {
 		return fmt.Errorf("mesh D param must not be 0 or exceed %d, but got %d", maxMeshParam, conf.MeshD)
 	}
