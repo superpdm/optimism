@@ -3,7 +3,6 @@ pragma solidity 0.8.15;
 
 import { Proxy } from "src/universal/Proxy.sol";
 import { LibString } from "@solady/utils/LibString.sol";
-import "forge-std/console.sol";
 
 library DeployUtils {
     // This takes a sender and an identifier and returns a deterministic address based on the two.
@@ -22,8 +21,6 @@ library DeployUtils {
 
     function assertEIP1967Implementation(address _proxy) internal {
         address implementation = Proxy(payable(_proxy)).implementation();
-        console.log("implementation: ");
-        console.logAddress(implementation);
         assertValidContractAddress(implementation);
     }
 

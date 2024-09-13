@@ -2,8 +2,6 @@
 pragma solidity 0.8.15;
 
 import { Script } from "forge-std/Script.sol";
-import "forge-std/console.sol";
-
 import { LibString } from "@solady/utils/LibString.sol";
 
 import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
@@ -304,14 +302,7 @@ contract DeployImplementations is Script {
         });
     }
 
-    struct Blueprints {
-        address addressManager;
-        address proxy;
-        address proxyAdmin;
-        address l1ChugSplashProxy;
-        address resolvedDelegateProxy;
-    }
-
+    // Deploy and initialize the OPStackManager contract that is fronted by a proxy.
     function createOPSMContract(
         DeployImplementationsInput _dii,
         DeployImplementationsOutput,
@@ -328,16 +319,11 @@ contract DeployImplementations is Script {
         ProxyAdmin proxyAdmin = _dii.superchainProxyAdmin();
         address proxyAdminOwner = proxyAdmin.owner();
 
+        // We broadcast as the proxyAdminOwner address due to the ProxyAdmin's `onlyOwner` modifier.
         vm.startBroadcast(proxyAdminOwner);
         Proxy proxy = new Proxy(address(proxyAdmin));
         OPStackManager opsm = new OPStackManager();
-        vm.stopBroadcast();
 
-        console.log("Address manager contract inside deploy implementations createOPSMcontract: ");
-        console.logAddress(blueprints.addressManager);
-
-        // We broadcast as the proxyAdminOwner address due to the ProxyAdmin's `onlyOwner` modifier.
-        vm.startBroadcast(proxyAdminOwner);
         proxyAdmin.upgradeAndCall(
             payable(proxy), address(opsm), abi.encodeWithSelector(opsm.initializePart1.selector, blueprints)
         );
@@ -350,13 +336,6 @@ contract DeployImplementations is Script {
             payable(proxy), address(opsm), abi.encodeWithSelector(opsm.initializePart3.selector, release, true, setters)
         );
         vm.stopBroadcast();
-
-        string memory latestRelease = OPStackManager(address(proxy)).latestRelease();
-        console.log("OPStackManager deployed with release:", latestRelease);
-
-        address x = address(OPStackManager(address(proxy)).blueprints().addressManager);
-        console.log("Address manager contract inside deploy implementations createOPSMcontract again: ");
-        console.logAddress(x);
 
         opsmProxy_ = OPStackManager(address(proxy));
     }
@@ -371,8 +350,6 @@ contract DeployImplementations is Script {
 
         vm.startBroadcast(msg.sender);
         blueprints.addressManager = deployBytecode(Blueprint.blueprintDeployerBytecode(type(AddressManager).creationCode), salt);
-        console.log("Address manager contract inside deploy implementations: ");
-        console.logAddress(blueprints.addressManager);
         blueprints.proxy = deployBytecode(Blueprint.blueprintDeployerBytecode(type(Proxy).creationCode), salt);
         blueprints.proxyAdmin = deployBytecode(Blueprint.blueprintDeployerBytecode(type(ProxyAdmin).creationCode), salt);
         blueprints.l1ChugSplashProxy = deployBytecode(Blueprint.blueprintDeployerBytecode(type(L1ChugSplashProxy).creationCode), salt);
