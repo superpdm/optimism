@@ -95,8 +95,7 @@ contract Proxy {
     //// @notice Queries the implementation address.
     /// @return Implementation address.
     function implementation() public virtual proxyCallIfNotAdmin returns (address) {
-        address impl = _getImplementation();
-        return impl;
+        return _getImplementation();
     }
 
     /// @notice Sets the implementation address.
