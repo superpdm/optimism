@@ -2,6 +2,7 @@
 pragma solidity 0.8.15;
 
 import { Script } from "forge-std/Script.sol";
+
 import { LibString } from "@solady/utils/LibString.sol";
 
 import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
