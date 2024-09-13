@@ -2,7 +2,6 @@
 pragma solidity 0.8.15;
 
 import { Blueprint } from "src/libraries/Blueprint.sol";
-import "forge-std/console.sol";
 
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
@@ -212,35 +211,35 @@ contract OPStackManager is ISemver, Initializable {
         }
     }
 
-    /// @notice Callable by the OPSM owner to release a set of implementation contracts for a given
-    /// release version. This must be called with `_isLatest` set to true before any chains can be deployed.
-    /// @param _release The release version to set implementations for, of the format `op-contracts/vX.Y.Z`.
-    /// @param _isLatest Whether the release version is the latest released version. This is
-    /// significant because the latest version is used to deploy chains in the `deploy` function.
-    /// @param _setters The set of implementations to set for the release version.
-    function setRelease(
-        string memory _release,
-        bool _isLatest,
-        ImplementationSetter[] calldata _setters,
-        Blueprints memory _blueprints
-    )
-        external
-    {
-        // TODO Add auth to this method.
+    // / @notice Callable by the OPSM owner to release a set of implementation contracts for a given
+    // / release version. This must be called with `_isLatest` set to true before any chains can be deployed.
+    // / @param _release The release version to set implementations for, of the format `op-contracts/vX.Y.Z`.
+    // / @param _isLatest Whether the release version is the latest released version. This is
+    // / significant because the latest version is used to deploy chains in the `deploy` function.
+    // / @param _setters The set of implementations to set for the release version.
+    // function setRelease(
+    //     string memory _release,
+    //     bool _isLatest,
+    //     ImplementationSetter[] calldata _setters,
+    //     Blueprints memory _blueprints
+    // )
+    //     external
+    // {
+    //     // TODO Add auth to this method.
 
-        if (_isLatest) latestRelease = _release;
+    //     if (_isLatest) latestRelease = _release;
 
-        for (uint256 i = 0; i < _setters.length; i++) {
-            ImplementationSetter calldata setter = _setters[i];
-            Implementation storage impl = implementations[_release][setter.name];
-            if (impl.logic != address(0)) revert AlreadyReleased();
+    //     for (uint256 i = 0; i < _setters.length; i++) {
+    //         ImplementationSetter calldata setter = _setters[i];
+    //         Implementation storage impl = implementations[_release][setter.name];
+    //         if (impl.logic != address(0)) revert AlreadyReleased();
 
-            impl.initializer = setter.info.initializer;
-            impl.logic = setter.info.logic;
-        }
+    //         impl.initializer = setter.info.initializer;
+    //         impl.logic = setter.info.logic;
+    //     }
 
-        blueprint = _blueprints;
-    }
+    //     blueprint = _blueprints;
+    // }
 
     function deploy(DeployInput calldata _input) external returns (DeployOutput memory) {
         assertValidInputs(_input);
@@ -257,8 +256,6 @@ contract OPStackManager is ISemver, Initializable {
         // this contract, and then transfer ownership to the specified owner at the end of deployment.
         // The AddressManager is used to store the implementation for the L1CrossDomainMessenger
         // due to it's usage of the legacy ResolvedDelegateProxy.
-        console.log("Deploying AddressManager with salt: ");
-        console.logAddress(blueprint.addressManager);
         output.addressManager = AddressManager(Blueprint.deployFrom(blueprint.addressManager, salt));
         output.opChainProxyAdmin =
             ProxyAdmin(Blueprint.deployFrom(blueprint.proxyAdmin, salt, abi.encode(address(this))));
