@@ -10,13 +10,7 @@ import { SystemConfigInterop } from "src/L1/SystemConfigInterop.sol";
 
 /// @custom:proxied TODO this is not proxied yet.
 contract OPStackManagerInterop is OPStackManager {
-    constructor(
-        SuperchainConfig _superchainConfig,
-        ProtocolVersions _protocolVersions,
-        Blueprints memory _blueprints
-    )
-        OPStackManager(_superchainConfig, _protocolVersions, _blueprints)
-    { }
+    constructor() { }
 
     // The `SystemConfigInterop` contract has an extra `address _dependencyManager` argument
     // that we must account for.

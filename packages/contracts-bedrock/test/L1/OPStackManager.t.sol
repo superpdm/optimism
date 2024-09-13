@@ -12,13 +12,7 @@ import { ProtocolVersions } from "src/L1/ProtocolVersions.sol";
 
 // Exposes internal functions for testing.
 contract OPStackManager_Harness is OPStackManager {
-    constructor(
-        SuperchainConfig _superchainConfig,
-        ProtocolVersions _protocolVersions,
-        Blueprints memory _blueprints
-    )
-        OPStackManager(_superchainConfig, _protocolVersions, _blueprints)
-    { }
+    constructor() { }
 
     function chainIdToBatchInboxAddress_exposed(uint256 l2ChainId) public pure returns (address) {
         return super.chainIdToBatchInboxAddress(l2ChainId);
@@ -92,17 +86,7 @@ contract OPStackManager_InternalMethods_Test is Test {
     OPStackManager_Harness opsmHarness;
 
     function setUp() public {
-        opsmHarness = new OPStackManager_Harness({
-            _superchainConfig: SuperchainConfig(makeAddr("superchainConfig")),
-            _protocolVersions: ProtocolVersions(makeAddr("protocolVersions")),
-            _blueprints: OPStackManager.Blueprints({
-                addressManager: makeAddr("addressManager"),
-                proxy: makeAddr("proxy"),
-                proxyAdmin: makeAddr("proxyAdmin"),
-                l1ChugSplashProxy: makeAddr("l1ChugSplashProxy"),
-                resolvedDelegateProxy: makeAddr("resolvedDelegateProxy")
-            })
-        });
+        opsmHarness = new OPStackManager_Harness();
     }
 
     function test_calculatesBatchInboxAddress_succeeds() public view {

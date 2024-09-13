@@ -304,10 +304,20 @@ contract DeployImplementations is Script {
         });
     }
 
+    struct Blueprints {
+        address addressManager;
+        address proxy;
+        address proxyAdmin;
+        address l1ChugSplashProxy;
+        address resolvedDelegateProxy;
+    }
+
     function createOPSMContract(
         DeployImplementationsInput _dii,
         DeployImplementationsOutput,
-        OPStackManager.Blueprints memory blueprints
+        OPStackManager.Blueprints memory blueprints,
+        string memory release,
+        OPStackManager.ImplementationSetter[] memory setters
     )
         internal
         virtual
@@ -320,16 +330,33 @@ contract DeployImplementations is Script {
 
         vm.startBroadcast(proxyAdminOwner);
         Proxy proxy = new Proxy(address(proxyAdmin));
-        OPStackManager opsm = new OPStackManager({
-            _superchainConfig: superchainConfigProxy,
-            _protocolVersions: protocolVersionsProxy,
-            _blueprints: blueprints
-        });
+        OPStackManager opsm = new OPStackManager();
         vm.stopBroadcast();
 
+        console.log("Address manager contract inside deploy implementations createOPSMcontract: ");
+        console.logAddress(blueprints.addressManager);
+
         // We broadcast as the proxyAdminOwner address due to the ProxyAdmin's `onlyOwner` modifier.
-        vm.broadcast(proxyAdminOwner);
-        proxyAdmin.upgrade(payable(proxy), address(opsm));
+        vm.startBroadcast(proxyAdminOwner);
+        proxyAdmin.upgradeAndCall(
+            payable(proxy), address(opsm), abi.encodeWithSelector(opsm.initializePart1.selector, blueprints)
+        );
+        proxyAdmin.upgradeAndCall(
+            payable(proxy),
+            address(opsm),
+            abi.encodeWithSelector(opsm.initializePart2.selector, superchainConfigProxy, protocolVersionsProxy)
+        );
+        proxyAdmin.upgradeAndCall(
+            payable(proxy), address(opsm), abi.encodeWithSelector(opsm.initializePart3.selector, release, true, setters)
+        );
+        vm.stopBroadcast();
+
+        string memory latestRelease = OPStackManager(address(proxy)).latestRelease();
+        console.log("OPStackManager deployed with release:", latestRelease);
+
+        address x = address(OPStackManager(address(proxy)).blueprints().addressManager);
+        console.log("Address manager contract inside deploy implementations createOPSMcontract again: ");
+        console.logAddress(x);
 
         opsmProxy_ = OPStackManager(address(proxy));
     }
@@ -344,15 +371,14 @@ contract DeployImplementations is Script {
 
         vm.startBroadcast(msg.sender);
         blueprints.addressManager = deployBytecode(Blueprint.blueprintDeployerBytecode(type(AddressManager).creationCode), salt);
+        console.log("Address manager contract inside deploy implementations: ");
+        console.logAddress(blueprints.addressManager);
         blueprints.proxy = deployBytecode(Blueprint.blueprintDeployerBytecode(type(Proxy).creationCode), salt);
         blueprints.proxyAdmin = deployBytecode(Blueprint.blueprintDeployerBytecode(type(ProxyAdmin).creationCode), salt);
         blueprints.l1ChugSplashProxy = deployBytecode(Blueprint.blueprintDeployerBytecode(type(L1ChugSplashProxy).creationCode), salt);
         blueprints.resolvedDelegateProxy = deployBytecode(Blueprint.blueprintDeployerBytecode(type(ResolvedDelegateProxy).creationCode), salt);
         vm.stopBroadcast();
         // forgefmt: disable-end
-
-        // This call contains a broadcast to deploy OPSM which is proxied.
-        OPStackManager opsm = createOPSMContract(_dii, _dio, blueprints);
 
         OPStackManager.ImplementationSetter[] memory setters = new OPStackManager.ImplementationSetter[](6);
         setters[0] = OPStackManager.ImplementationSetter({
@@ -381,8 +407,8 @@ contract DeployImplementations is Script {
             info: OPStackManager.Implementation(address(_dio.l1StandardBridgeImpl()), L1StandardBridge.initialize.selector)
         });
 
-        vm.broadcast(msg.sender);
-        opsm.setRelease({ _release: release, _isLatest: true, _setters: setters });
+        // This call contains a broadcast to deploy OPSM which is proxied.
+        OPStackManager opsm = createOPSMContract(_dii, _dio, blueprints, release, setters);
 
         vm.label(address(opsm), "OPStackManager");
         _dio.set(_dio.opsm.selector, address(opsm));
@@ -593,21 +619,41 @@ contract DeployImplementationsInterop is DeployImplementations {
     function createOPSMContract(
         DeployImplementationsInput _dii,
         DeployImplementationsOutput,
-        OPStackManager.Blueprints memory blueprints
+        OPStackManager.Blueprints memory blueprints,
+        string memory release,
+        OPStackManager.ImplementationSetter[] memory setters
     )
         internal
+        virtual
         override
-        returns (OPStackManager opsm_)
+        returns (OPStackManager opsmProxy_)
     {
         SuperchainConfig superchainConfigProxy = _dii.superchainConfigProxy();
         ProtocolVersions protocolVersionsProxy = _dii.protocolVersionsProxy();
+        ProxyAdmin proxyAdmin = _dii.superchainProxyAdmin();
+        address proxyAdminOwner = proxyAdmin.owner();
 
-        vm.broadcast(msg.sender);
-        opsm_ = new OPStackManagerInterop({
-            _superchainConfig: superchainConfigProxy,
-            _protocolVersions: protocolVersionsProxy,
-            _blueprints: blueprints
-        });
+        vm.startBroadcast(proxyAdminOwner);
+        Proxy proxy = new Proxy(address(proxyAdmin));
+        OPStackManagerInterop opsm = new OPStackManagerInterop();
+        vm.stopBroadcast();
+
+        // We broadcast as the proxyAdminOwner address due to the ProxyAdmin's `onlyOwner` modifier.
+        vm.startBroadcast(proxyAdminOwner);
+        proxyAdmin.upgradeAndCall(
+            payable(proxy), address(opsm), abi.encodeWithSelector(opsm.initializePart1.selector, blueprints)
+        );
+        proxyAdmin.upgradeAndCall(
+            payable(proxy),
+            address(opsm),
+            abi.encodeWithSelector(opsm.initializePart2.selector, superchainConfigProxy, protocolVersionsProxy)
+        );
+        proxyAdmin.upgradeAndCall(
+            payable(proxy), address(opsm), abi.encodeWithSelector(opsm.initializePart3.selector, release, true, setters)
+        );
+        vm.stopBroadcast();
+
+        opsmProxy_ = OPStackManager(address(proxy));
     }
 
     function deployOptimismPortalImpl(
