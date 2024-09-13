@@ -51,6 +51,7 @@ contract DeployImplementationsInput {
     // Outputs from DeploySuperchain.s.sol.
     SuperchainConfig internal _superchainConfigProxy;
     ProtocolVersions internal _protocolVersionsProxy;
+    ProxyAdmin internal _superchainProxyAdmin;
 
     function set(bytes4 sel, uint256 _value) public {
         require(_value != 0, "DeployImplementationsInput: cannot set zero value");
@@ -81,6 +82,7 @@ contract DeployImplementationsInput {
         require(_addr != address(0), "DeployImplementationsInput: cannot set zero address");
         if (sel == this.superchainConfigProxy.selector) _superchainConfigProxy = SuperchainConfig(_addr);
         else if (sel == this.protocolVersionsProxy.selector) _protocolVersionsProxy = ProtocolVersions(_addr);
+        else if (sel == this.superchainProxyAdmin.selector) _superchainProxyAdmin = ProxyAdmin(_addr);
         else revert("DeployImplementationsInput: unknown selector");
     }
 
@@ -133,8 +135,8 @@ contract DeployImplementationsInput {
     }
 
     function superchainProxyAdmin() public view returns (ProxyAdmin) {
-        assertInputSet();
-        return inputs.superchainProxyAdmin;
+        require(address(_superchainProxyAdmin) != address(0), "DeployImplementationsInput: not set");
+        return _superchainProxyAdmin;
     }
 }
 
@@ -175,7 +177,7 @@ contract DeployImplementationsOutput is Script {
         require(false, "DeployImplementationsOutput: not implemented");
     }
 
-    function checkOutput() public view {
+    function checkOutput() public {
         address[] memory addrs = Solarray.addresses(
             address(this.opsm()),
             address(this.optimismPortalImpl()),
@@ -193,8 +195,9 @@ contract DeployImplementationsOutput is Script {
     }
 
     function opsm() public returns (OPStackManager) {
-        DeployUtils.assertValidContractAddress(address(outputs.opsm));
+        DeployUtils.assertValidContractAddress(address(_opsm));
         // We prank as the zero address due to the Proxy's `proxyCallIfNotAdmin` modifier.
+        // Pranking inside this function also means it can no longer be considered `view`.
         vm.prank(address(0));
         DeployUtils.assertEIP1967Implementation(address(_opsm));
         return _opsm;

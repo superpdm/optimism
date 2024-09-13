@@ -22,6 +22,8 @@ library DeployUtils {
 
     function assertEIP1967Implementation(address _proxy) internal {
         address implementation = Proxy(payable(_proxy)).implementation();
+        console.log("implementation: ");
+        console.logAddress(implementation);
         assertValidContractAddress(implementation);
     }
 

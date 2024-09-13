@@ -2,6 +2,7 @@
 pragma solidity 0.8.15;
 
 import { Blueprint } from "src/libraries/Blueprint.sol";
+import "forge-std/console.sol";
 
 import { ISemver } from "src/universal/interfaces/ISemver.sol";
 import { Proxy } from "src/universal/Proxy.sol";
@@ -206,6 +207,8 @@ contract OPStackManager is ISemver {
         // this contract, and then transfer ownership to the specified owner at the end of deployment.
         // The AddressManager is used to store the implementation for the L1CrossDomainMessenger
         // due to it's usage of the legacy ResolvedDelegateProxy.
+        console.log("Deploying AddressManager with salt: ");
+        console.logAddress(blueprint.addressManager);
         output.addressManager = AddressManager(Blueprint.deployFrom(blueprint.addressManager, salt));
         output.opChainProxyAdmin =
             ProxyAdmin(Blueprint.deployFrom(blueprint.proxyAdmin, salt, abi.encode(address(this))));
