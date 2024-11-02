@@ -49,7 +49,8 @@ fs_permissions = [
   { access='read', path = './forge-artifacts/' },
   { access='write', path='./semver-lock.json' },
   { access='read-write', path='./.testdata/' },
-  { access='read', path='./kout-deployment' }
+  { access='read', path='./kout-deployment' },
+  { access='read', path='./test/fixtures' },
 ]
 libs = ["node_modules", "lib"]
 
@@ -73,6 +74,13 @@ fuzz = { runs = 512 }
 runs = 256
 depth = 32
 
+[profile.ciheavy]
+fuzz = { runs = 10000 }
+
+[profile.ciheavy.invariant]
+runs = 128
+depth = 512
+
 ################################################################
 #                         PROFILE: LITE                        #
 ################################################################
@@ -86,7 +94,7 @@ optimizer = false
 # See test/kontrol/README.md for an explanation of how the profiles are configured
 
 [profile.kdeploy]
-src = 'src/L1'
+src = 'src'
 out = 'kout-deployment'
 test = 'test/kontrol'
 script = 'scripts-kontrol'

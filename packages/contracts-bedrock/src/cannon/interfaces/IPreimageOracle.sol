@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity ^0.8.0;
 
 /// @title IPreimageOracle
 /// @notice Interface for a preimage oracle.
@@ -88,4 +88,9 @@ interface IPreimageOracle {
         bytes calldata _input
     )
         external;
+
+    /// @notice Returns the minimum size (in bytes) of a large preimage proposal.
+    function minProposalSize() external view returns (uint256);
+
+    function __constructor__(uint256 _minProposalSize, uint256 _challengePeriod) external;
 }
